@@ -28,76 +28,19 @@ class _TaskManagerState extends State<TaskManager> {
     super.dispose();
   }
 
-  void _addTask() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Add Task"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _taskController,
-                decoration: const InputDecoration(labelText: "Task Name"),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _selectedDate == null
-                          ? "No Date Chosen"
-                          : "Due: ${_formatDate(_selectedDate!)}",
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _pickDate,
-                    child: const Text("Choose Date"),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (_taskController.text.isNotEmpty && _selectedDate != null) {
-                  setState(() {
-                    tasks.add(_taskController.text);
-                    taskStatus.add(false);
-                    taskDates.add(_formatDate(_selectedDate!));
-                    _taskController.clear();
-                    _selectedDate = null;
-                  });
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text("Add"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _pickDate() async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime(2101),
-    );
-    if (picked != null) {
+ void _addTask() {
+    if (_taskController.text.isNotEmpty && _selectedDate != null) {
       setState(() {
-        _selectedDate = picked;
+        tasks.add(_taskController.text);
+        taskStatus.add(false);
+        taskDates.add(_formatDate(_selectedDate!));
+        _taskController.clear();
+        _selectedDate = null;
       });
+      Navigator.of(context).pop();
     }
   }
+
 
   String _formatDate(DateTime date) {
     final today = DateTime.now();
@@ -113,7 +56,6 @@ class _TaskManagerState extends State<TaskManager> {
       return formattedDate;
     }
   }
-
 
 
   @override
@@ -145,19 +87,77 @@ class _TaskManagerState extends State<TaskManager> {
                       : TextDecoration.none,
                 ),
               ),
-              subtitle: Text("Due: ${taskDates[index] == DateTime.now().toString().split(' ')[0] ? 'Today' : taskDates[index]}"),
+              subtitle: Text("Due: ${taskDates[index]}"),
               trailing: const Icon(Icons.edit),
             ),
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _addTask,
+        onPressed: (){
+          showDialog(
+            context: context,
+            builder: (context) {
+              return StatefulBuilder(
+                builder: (context, setState) {
+                  return AlertDialog(
+                    title: const Text("Add Task"),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: _taskController,
+                          decoration: const InputDecoration(labelText: "Task Name"),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _selectedDate == null
+                                    ? "No Date Chosen"
+                                    : "Due: ${_formatDate(_selectedDate!)}",
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                final DateTime? picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: DateTime.now(),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime(2101),
+                                );
+                                if (picked != null) {
+                                  setState(() {
+                                    _selectedDate = picked;
+                                  });
+                                }
+                              },
+                              child: const Text("Choose Date"),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text("Cancel"),
+                      ),
+                      ElevatedButton(
+                        onPressed:_addTask,
+                        child: const Text("Add"),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          );
+        },
         tooltip: "Add Task",
         child: const Icon(Icons.add),
       ),
     );
   }
 }
-
-

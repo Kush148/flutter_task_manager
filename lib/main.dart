@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'database_helper.dart';
+
 void main() {
   runApp(const MaterialApp(
     home: TaskManager(),
@@ -28,7 +30,7 @@ class _TaskManagerState extends State<TaskManager> {
     super.dispose();
   }
 
- void _addTask() {
+/* void _addTask() {
     if (_taskController.text.isNotEmpty && _selectedDate != null) {
       setState(() {
         tasks.add(_taskController.text);
@@ -39,7 +41,33 @@ class _TaskManagerState extends State<TaskManager> {
       });
       Navigator.of(context).pop();
     }
+  }*/
+
+  void _addTask() async {
+    if (_taskController.text.isNotEmpty) {
+      String dueDate = _selectedDate != null ? _formatDate(_selectedDate!) : "No Date";
+      await DatabaseHelper().insertTask(_taskController.text, false, dueDate);
+
+      // Clear the input and reset the date
+      _taskController.clear();
+      _selectedDate = null;
+
+      // Refresh the task list from the database
+      _loadTasks();
+
+      Navigator.of(context).pop();
+    }
   }
+
+  void _loadTasks() async {
+    final data = await DatabaseHelper().getTasks();
+    setState(() {
+      tasks = data.map((task) => task['title'].toString()).toList();
+      taskStatus = data.map((task) => task['isCompleted'] == 1).toList();
+      taskDates = data.map((task) => task['dueDate'].toString()).toList();
+    });
+  }
+
 
 
   String _formatDate(DateTime date) {
@@ -65,36 +93,54 @@ class _TaskManagerState extends State<TaskManager> {
         title: const Text("Task Manager"),
         centerTitle: true,
       ),
-      body: ListView.builder(
-        itemCount: tasks.length,
-        itemBuilder: (context, index) {
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: ListTile(
-              leading: Checkbox(
-                value: taskStatus[index],
-                onChanged: (bool? value) {
-                  setState(() {
-                    taskStatus[index] = value ?? false;
-                  });
-                },
-              ),
-              title: Text(
-                tasks[index],
-                style: TextStyle(
-                  decoration: taskStatus[index]
-                      ? TextDecoration.lineThrough
-                      : TextDecoration.none,
+      body: FutureBuilder(
+        future: DatabaseHelper().getTasks(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final data = snapshot.data as List<Map<String, dynamic>>;
+          if (data.isEmpty) {
+            return const Center(child: Text("No tasks available"));
+          }
+          return ListView.builder(
+            itemCount: data.length,
+            itemBuilder: (context, index) {
+              final task = data[index];
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  leading: Checkbox(
+                    value: task['isCompleted'] == 1,
+                    onChanged: (bool? value) async {
+                      await DatabaseHelper().updateTaskStatus(task['id'], value ?? false);
+                      _loadTasks();
+                    },
+                  ),
+                  title: Text(
+                    task['title'],
+                    style: TextStyle(
+                      decoration: task['isCompleted'] == 1
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                    ),
+                  ),
+                  subtitle: Text("Due: ${task['dueDate']}"),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: () async {
+                      await DatabaseHelper().deleteTask(task['id']);
+                      _loadTasks();
+                    },
+                  ),
                 ),
-              ),
-              subtitle: Text("Due: ${taskDates[index]}"),
-              trailing: const Icon(Icons.edit),
-            ),
+              );
+            },
           );
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: (){
+        onPressed: () {
           showDialog(
             context: context,
             builder: (context) {
@@ -145,7 +191,7 @@ class _TaskManagerState extends State<TaskManager> {
                         child: const Text("Cancel"),
                       ),
                       ElevatedButton(
-                        onPressed:_addTask,
+                        onPressed: _addTask,
                         child: const Text("Add"),
                       ),
                     ],
@@ -160,4 +206,5 @@ class _TaskManagerState extends State<TaskManager> {
       ),
     );
   }
+
 }

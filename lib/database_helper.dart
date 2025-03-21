@@ -51,6 +51,21 @@ class DatabaseHelper {
     return await db.query('tasks');
   }
 
+  Future<void> updateTask(int id, String newTitle, String newDueDate, bool isCompleted) async {
+    final db = await database;
+
+    await db.update(
+      'tasks',
+      {
+        'title': newTitle,
+        'dueDate': newDueDate,
+        'isCompleted': isCompleted ? 1 : 0,
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<int> updateTaskStatus(int id, bool isCompleted) async {
     final db = await database;
     return await db.update(

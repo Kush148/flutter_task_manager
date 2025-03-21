@@ -30,34 +30,51 @@ class _TaskManagerState extends State<TaskManager> {
     super.dispose();
   }
 
-/* void _addTask() {
+  Future<void> _addTask() async {
     if (_taskController.text.isNotEmpty && _selectedDate != null) {
-      setState(() {
-        tasks.add(_taskController.text);
-        taskStatus.add(false);
-        taskDates.add(_formatDate(_selectedDate!));
-        _taskController.clear();
-        _selectedDate = null;
-      });
-      Navigator.of(context).pop();
-    }
-  }*/
-
-  void _addTask() async {
-    if (_taskController.text.isNotEmpty) {
-      String dueDate = _selectedDate != null ? _formatDate(_selectedDate!) : "No Date";
-      await DatabaseHelper().insertTask(_taskController.text, false, dueDate);
-
-      // Clear the input and reset the date
+      await DatabaseHelper().insertTask(
+        _taskController.text,
+        false,
+        _formatDate(_selectedDate!),
+      );
       _taskController.clear();
       _selectedDate = null;
-
-      // Refresh the task list from the database
       _loadTasks();
-
       Navigator.of(context).pop();
+    } else {
+      _showErrorDialog("Please enter both a task name and a due date.");
     }
   }
+
+  Future<void> _updateTask(int id, String title, DateTime dueDate, bool isCompleted) async {
+    if (title.isNotEmpty) {
+      await DatabaseHelper().updateTask(id, title, _formatDate(dueDate), isCompleted);
+      _loadTasks();
+      Navigator.of(context).pop();
+    } else {
+           _showErrorDialog("Please enter both a task name and a due date.");
+    }
+  }
+
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Error"),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   void _loadTasks() async {
     final data = await DatabaseHelper().getTasks();
@@ -67,8 +84,6 @@ class _TaskManagerState extends State<TaskManager> {
       taskDates = data.map((task) => task['dueDate'].toString()).toList();
     });
   }
-
-
 
   String _formatDate(DateTime date) {
     final today = DateTime.now();
@@ -126,12 +141,87 @@ class _TaskManagerState extends State<TaskManager> {
                     ),
                   ),
                   subtitle: Text("Due: ${task['dueDate']}"),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () async {
-                      await DatabaseHelper().deleteTask(task['id']);
-                      _loadTasks();
-                    },
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () {
+                          _taskController.text = task['title'];
+                          _selectedDate = DateFormat('dd-MM-yyyy').parse(task['dueDate']);
+                          showDialog(
+                            context: context,
+                            builder: (context) {
+                              return StatefulBuilder(
+                                builder: (context, setState) {
+                                  return AlertDialog(
+                                    title: const Text("Edit Task"),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        TextField(
+                                          controller: _taskController,
+                                          decoration: const InputDecoration(labelText: "Task Name"),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                _selectedDate == null
+                                                    ? "No Date Chosen"
+                                                    : "Due: ${_formatDate(_selectedDate!)}",
+                                              ),
+                                            ),
+                                            TextButton(
+                                              onPressed: () async {
+                                                _selectedDate = null;
+                                                final DateTime? picked = await showDatePicker(
+                                                  context: context,
+                                                  initialDate: DateTime.now(),
+                                                  firstDate: DateTime.now(),
+                                                  lastDate: DateTime(2101),
+                                                );
+                                                if (picked != null) {
+                                                  setState(() {
+                                                    _selectedDate = picked;
+                                                  });
+                                                }
+                                              },
+                                              child: const Text("Choose Date"),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text("Cancel"),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: (){
+                                          _updateTask(task['id'], _taskController.text, _selectedDate!, task['isCompleted'] == 1);
+                                        },
+                                        child: const Text("Update"),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete),
+                        onPressed: () async {
+                          await DatabaseHelper().deleteTask(task['id']);
+                          _loadTasks();
+                        },
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -206,5 +296,4 @@ class _TaskManagerState extends State<TaskManager> {
       ),
     );
   }
-
 }

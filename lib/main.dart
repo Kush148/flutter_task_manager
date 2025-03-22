@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
 import 'database_helper.dart';
@@ -17,12 +18,13 @@ class TaskManager extends StatefulWidget {
 }
 
 class _TaskManagerState extends State<TaskManager> {
-  List<String> tasks = ["Buy groceries", "Complete project", "Workout"];
-  List<bool> taskStatus = [false, true, false];
+  late List<String> tasks;
+  late List<bool> taskStatus;
   List<String> taskDates = ["Tomorrow", "Next Week", "Today"];
 
   final TextEditingController _taskController = TextEditingController();
   DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
 
   @override
   void dispose() {
@@ -31,14 +33,16 @@ class _TaskManagerState extends State<TaskManager> {
   }
 
   Future<void> _addTask() async {
-    if (_taskController.text.isNotEmpty && _selectedDate != null) {
+    if (_taskController.text.isNotEmpty && _selectedDate != null && _selectedTime != null) {
       await DatabaseHelper().insertTask(
         _taskController.text,
         false,
         _formatDate(_selectedDate!),
+        _selectedTime!.format(context).toString(),
       );
       _taskController.clear();
       _selectedDate = null;
+      _selectedTime = null;
       _loadTasks();
       Navigator.of(context).pop();
     } else {
@@ -46,16 +50,17 @@ class _TaskManagerState extends State<TaskManager> {
     }
   }
 
-  Future<void> _updateTask(int id, String title, DateTime dueDate, bool isCompleted) async {
+  Future<void> _updateTask(int id, String title, DateTime dueDate,
+      TimeOfDay dueTime, bool isCompleted) async {
     if (title.isNotEmpty) {
-      await DatabaseHelper().updateTask(id, title, _formatDate(dueDate), isCompleted);
+      await DatabaseHelper().updateTask(
+          id, title, _formatDate(dueDate), dueTime.toString(), isCompleted);
       _loadTasks();
       Navigator.of(context).pop();
     } else {
-           _showErrorDialog("Please enter both a task name and a due date.");
+      _showErrorDialog("Please enter both a task name and a due date.");
     }
   }
-
 
   void _showErrorDialog(String message) {
     showDialog(
@@ -75,7 +80,6 @@ class _TaskManagerState extends State<TaskManager> {
     );
   }
 
-
   void _loadTasks() async {
     final data = await DatabaseHelper().getTasks();
     setState(() {
@@ -91,15 +95,18 @@ class _TaskManagerState extends State<TaskManager> {
 
     String formattedDate = DateFormat('dd-MM-yyyy').format(date);
 
-    if (date.year == today.year && date.month == today.month && date.day == today.day) {
+    if (date.year == today.year &&
+        date.month == today.month &&
+        date.day == today.day) {
       return "$formattedDate (Today)";
-    } else if (date.year == tomorrow.year && date.month == tomorrow.month && date.day == tomorrow.day) {
+    } else if (date.year == tomorrow.year &&
+        date.month == tomorrow.month &&
+        date.day == tomorrow.day) {
       return "$formattedDate (Tomorrow)";
     } else {
       return formattedDate;
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -128,7 +135,8 @@ class _TaskManagerState extends State<TaskManager> {
                   leading: Checkbox(
                     value: task['isCompleted'] == 1,
                     onChanged: (bool? value) async {
-                      await DatabaseHelper().updateTaskStatus(task['id'], value ?? false);
+                      await DatabaseHelper()
+                          .updateTaskStatus(task['id'], value ?? false);
                       _loadTasks();
                     },
                   ),
@@ -140,7 +148,9 @@ class _TaskManagerState extends State<TaskManager> {
                           : TextDecoration.none,
                     ),
                   ),
-                  subtitle: Text("Due: ${task['dueDate']}"),
+                  subtitle: Text(
+                    "Due: ${task['dueDate']} ${task['dueTime']}",
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -148,7 +158,11 @@ class _TaskManagerState extends State<TaskManager> {
                         icon: const Icon(Icons.edit),
                         onPressed: () {
                           _taskController.text = task['title'];
-                          _selectedDate = DateFormat('dd-MM-yyyy').parse(task['dueDate']);
+                          _selectedDate =
+                              DateFormat('dd-MM-yyyy').parse(task['dueDate']);
+
+                          _selectedTime = task['dueTime'];
+
                           showDialog(
                             context: context,
                             builder: (context) {
@@ -161,7 +175,8 @@ class _TaskManagerState extends State<TaskManager> {
                                       children: [
                                         TextField(
                                           controller: _taskController,
-                                          decoration: const InputDecoration(labelText: "Task Name"),
+                                          decoration: const InputDecoration(
+                                              labelText: "Task Name"),
                                         ),
                                         const SizedBox(height: 16),
                                         Row(
@@ -176,7 +191,8 @@ class _TaskManagerState extends State<TaskManager> {
                                             TextButton(
                                               onPressed: () async {
                                                 _selectedDate = null;
-                                                final DateTime? picked = await showDatePicker(
+                                                final DateTime? picked =
+                                                    await showDatePicker(
                                                   context: context,
                                                   initialDate: DateTime.now(),
                                                   firstDate: DateTime.now(),
@@ -192,16 +208,47 @@ class _TaskManagerState extends State<TaskManager> {
                                             ),
                                           ],
                                         ),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                _selectedTime == null
+                                                    ? "No Time Chosen"
+                                                    : "Due: ${_selectedTime!.format(context)}",
+                                              ),
+                                            ),
+                                            TextButton(
+                                              onPressed: () async {
+                                                final pickedTime = await showTimePicker(
+                                                  context: context,
+                                                  initialTime: TimeOfDay.now(),
+                                                );
+                                                if (pickedTime != null) {
+                                                  setState(() {
+                                                    _selectedTime = pickedTime;
+                                                  });
+                                                }
+                                              },
+                                              child: const Text("Choose Time"),
+                                            ),
+                                          ],
+                                        ),
                                       ],
                                     ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(context).pop(),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(),
                                         child: const Text("Cancel"),
                                       ),
                                       ElevatedButton(
-                                        onPressed: (){
-                                          _updateTask(task['id'], _taskController.text, _selectedDate!, task['isCompleted'] == 1);
+                                        onPressed: () {
+                                          _updateTask(
+                                              task['id'],
+                                              _taskController.text,
+                                              _selectedDate!,
+                                              _selectedTime!,
+                                              task['isCompleted'] == 1);
                                         },
                                         child: const Text("Update"),
                                       ),
@@ -212,7 +259,6 @@ class _TaskManagerState extends State<TaskManager> {
                             },
                           );
                         },
-
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete),
@@ -243,7 +289,8 @@ class _TaskManagerState extends State<TaskManager> {
                       children: [
                         TextField(
                           controller: _taskController,
-                          decoration: const InputDecoration(labelText: "Task Name"),
+                          decoration:
+                              const InputDecoration(labelText: "Task Name"),
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -270,6 +317,32 @@ class _TaskManagerState extends State<TaskManager> {
                                 }
                               },
                               child: const Text("Choose Date"),
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _selectedTime == null
+                                    ? "No Time Chosen"
+                                    : "Due: ${_selectedTime!.format(context)}",
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                final pickedTime = await showTimePicker(
+                                  context: context,
+                                  initialTime: TimeOfDay.now(),
+
+                                );
+                                if (pickedTime != null) {
+                                  setState(() {
+                                    _selectedTime = pickedTime;
+                                  });
+                                }
+                              },
+                              child: const Text("Choose Time"),
                             ),
                           ],
                         ),

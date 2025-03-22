@@ -24,25 +24,38 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT,
             isCompleted INTEGER,
-            dueDate TEXT
+            dueDate TEXT,
+            dueTime TEXT
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE tasks ADD COLUMN dueTime TEXT');
+        }
       },
     );
   }
 
-  Future<int> insertTask(String title, bool isCompleted, String dueDate) async {
+
+  Future<int> insertTask(
+      String title, bool isCompleted, String dueDate, String dueTime) async {
     final db = await database;
     return await db.insert(
       'tasks',
-      {'title': title, 'isCompleted': isCompleted ? 1 : 0, 'dueDate': dueDate},
+      {
+        'title': title,
+        'isCompleted': isCompleted ? 1 : 0,
+        'dueDate': dueDate,
+        'dueTime': dueTime,
+      },
     );
   }
 
@@ -51,7 +64,8 @@ class DatabaseHelper {
     return await db.query('tasks');
   }
 
-  Future<void> updateTask(int id, String newTitle, String newDueDate, bool isCompleted) async {
+  Future<void> updateTask(
+      int id, String newTitle, String newDueDate, String newDueTime, bool isCompleted) async {
     final db = await database;
 
     await db.update(
@@ -59,6 +73,7 @@ class DatabaseHelper {
       {
         'title': newTitle,
         'dueDate': newDueDate,
+        'dueTime': newDueTime,
         'isCompleted': isCompleted ? 1 : 0,
       },
       where: 'id = ?',

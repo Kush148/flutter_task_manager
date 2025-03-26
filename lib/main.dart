@@ -91,7 +91,7 @@ class _TaskManagerState extends State<TaskManager> {
 
   String _formatDate(DateTime date) {
     final today = DateTime.now();
-    final tomorrow = today.add(Duration(days: 1));
+    final tomorrow = today.add(const Duration(days: 1));
 
     String formattedDate = DateFormat('dd-MM-yyyy').format(date);
 
@@ -160,7 +160,6 @@ class _TaskManagerState extends State<TaskManager> {
                           _taskController.text = task['title'];
                           _selectedDate =
                               DateFormat('dd-MM-yyyy').parse(task['dueDate']);
-
                           _selectedTime = task['dueTime'];
 
                           showDialog(
